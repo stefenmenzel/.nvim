@@ -93,6 +93,11 @@ vim.g.maplocalleader = ' '
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = false
 
+-- set godot executable location
+vim.g.godot_executable = '/home/zipzinger/godot_install/Godot_v4.4.1-stable_linux.x86_64'
+
+vim.opt.conceallevel = 1
+
 -- [[ Setting options ]]
 -- See `:help vim.opt`
 -- NOTE: You can change these options as you wish!
@@ -278,6 +283,8 @@ require('lazy').setup({
     version = '^1.0.0', -- optional: only update when a new 1.x version is released
   },
 
+  { 'habamax/vim-godot' },
+
   {
     'folke/noice.nvim',
     event = 'VeryLazy',
@@ -286,6 +293,28 @@ require('lazy').setup({
   },
 
   { 'rose-pine/neovim', name = 'rose-pine' },
+
+  {
+    'ray-x/lsp_signature.nvim',
+    event = 'InsertEnter',
+    opts = {
+      -- cfg options
+    },
+  },
+
+  { 'epwalsh/obsidian.nvim' },
+  -- {
+  --   'iabdelkareem/csharp.nvim',
+  --   dependencies = {
+  --     'williamboman/mason.nvim', -- Required, automatically installs omnisharp
+  --     'mfussenegger/nvim-dap',
+  --     'Tastyep/structlog.nvim', -- Optional, but highly recommended for debugging
+  --   },
+  --   config = function()
+  --     require('mason').setup() -- Mason setup must run before csharp, only if you want to use omnisharp
+  --     require('csharp').setup()
+  --   end,
+  -- },
 
   -- Alternatively, use `config = function() ... end` for full control over the configuration.
   -- If you prefer to call `setup` explicitly, use:
@@ -314,6 +343,55 @@ require('lazy').setup({
       },
     },
   },
+
+  {
+    'seblyng/roslyn.nvim',
+    ft = 'cs',
+    ---@module 'roslyn.config'
+    ---@type RoslynNvimConfig
+    opts = {
+      -- your configuration comes here; leave empty for default settings
+    },
+  },
+
+  { 'Hoffs/omnisharp-extended-lsp.nvim', lazy = true },
+
+  {
+    'hrsh7th/nvim-cmp',
+    dependencies = {
+      {
+        'garymjr/nvim-snippets',
+        opts = {
+          friendly_snippets = true,
+        },
+        dependencies = { 'rafamadriz/friendly-snippets' },
+      },
+    },
+    opts = function(_, opts)
+      opts.snippet = {
+        expand = function(item)
+          return LazyVim.cmp.expand(item.body)
+        end,
+      }
+      -- if LazyVim.has 'nvim-snippets' then
+      --   table.insert(opts.sources, { name = 'snippets' })
+      -- end
+    end,
+  },
+
+  {
+    'hrsh7th/cmp-nvim-lsp',
+    'hrsh7th/cmp-buffer',
+    'hrsh7th/cmp-path',
+  },
+  {
+    'garymjr/nvim-snippets',
+    opts = {
+      friendly_snippets = true,
+    },
+    dependencies = { 'rafamadriz/friendly-snippets' },
+  },
+  { 'rafamadriz/friendly-snippets' },
 
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
@@ -517,7 +595,7 @@ require('lazy').setup({
       -- Automatically install LSPs and related tools to stdpath for Neovim
       -- Mason must be loaded before its dependents so we need to set it up here.
       -- NOTE: `opts = {}` is the same as calling `require('mason').setup({})`
-      { 'williamboman/mason.nvim', opts = {} },
+      { 'williamboman/mason.nvim', opts = { ensure_installed = { 'csharpier', 'netcorebdg' } } },
       'williamboman/mason-lspconfig.nvim',
       'WhoIsSethDaniel/mason-tool-installer.nvim',
 
@@ -705,6 +783,8 @@ require('lazy').setup({
       --  - capabilities (table): Override fields in capabilities. Can be used to disable certain LSP features.
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
+      local lspconfig = require 'lspconfig'
+      -- local nvlsp = require 'nvim-lspconfig'
       local servers = {
         -- clangd = {},
         -- gopls = {},
@@ -766,6 +846,64 @@ require('lazy').setup({
           end,
         },
         -- docker_compose_language_services = {}, -- Docker Compose files
+
+        omnisharp = {
+          handlers = {
+            ['textDocument/definition'] = function(...)
+              return require('omnisharp_extended').handler(...)
+            end,
+          },
+          -- on_attach = lspconfig.on_attach,
+          -- capabilities = lspconfig.capabilities,
+          -- cmd = {
+          --   'dotnet',
+          --   vim.fn.stdpath 'data' .. '\\mason\\packages\\omnisharp\\libexec\\OmniSharp.dll',
+          -- },
+          cmd = {
+            'omnisharp',
+            'omnisharp-mono',
+            'mono',
+            '--languageserver',
+            '--hostPID',
+            tostring(pid),
+          },
+          use_mono = true,
+          -- root_dir = lspconfig.util.root_pattern('*.sln', '*.csproj'),
+          -- on_attach = function(client, bufnr)
+          --   local function buf_set_option(...)
+          --     vim.api.nvim_buf_set_option(bufnr, ...)
+          --   end
+          --   buf_set_option('omnisharp', 'omnisharp')
+          -- end,
+          -- capabilities = vim.lsp.protocol.make_client_capabilities(),
+          -- settings = {
+          --   FormattingOptions = {
+          --     EnableEditorConfigSupport = false,
+          --     OrganizeImports = true,
+          --   },
+          -- },
+          -- Sdk = {
+          --   IncludePrereleases = true,
+          -- },
+          keys = {
+            {
+              'gd',
+              -- LazyVim.has 'telescope.nvim' and function()
+              --   require('omnisharp_extended').telescope_lsp_definitions()
+              -- end or function()
+              --   require('omnisharp_extended').lsp_definitions()
+              -- end,
+              desc = 'Goto Definition',
+            },
+          },
+          enable_roslyn_analyzers = true,
+          organize_imports_on_format = false,
+          enable_import_completion = true,
+          enable_editorconfig_support = true,
+          enable_ms_build_load_projects_on_demand = false,
+          sdk_include_prereleases = true,
+          analyze_open_documents_only = false,
+        },
       }
 
       -- Ensure the servers and tools above are installed
@@ -824,7 +962,7 @@ require('lazy').setup({
         -- Disable "format_on_save lsp_fallback" for languages that don't
         -- have a well standardized coding style. You can add additional
         -- languages here or re-enable it for the disabled ones.
-        local disable_filetypes = { c = true, cpp = true, javascript = true }
+        local disable_filetypes = { c = true, cpp = true, javascript = true, c_sharp = true }
         if disable_filetypes[vim.bo[bufnr].filetype] then
           return nil
         else
@@ -836,11 +974,18 @@ require('lazy').setup({
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
+        cs = { 'csharpier' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
+      },
+      formatters = {
+        csharpier = {
+          command = 'dotnet-csharpier',
+          args = { '--write-stdout' },
+        },
       },
     },
   },
@@ -867,12 +1012,18 @@ require('lazy').setup({
           -- `friendly-snippets` contains a variety of premade snippets.
           --    See the README about individual language/framework/plugin snippets:
           --    https://github.com/rafamadriz/friendly-snippets
-          -- {
-          --   'rafamadriz/friendly-snippets',
-          --   config = function()
-          --     require('luasnip.loaders.from_vscode').lazy_load()
-          --   end,
-          -- },
+          {
+            'rafamadriz/friendly-snippets',
+            config = function()
+              require('luasnip.loaders.from_vscode').lazy_load { paths = '/home/zipzinger/.config/nvim/lua/json_snippets' }
+            end,
+          },
+          {
+            'rafamadriz/friendly-snippets',
+            config = function()
+              require('luasnip.loaders.from_lua').load { paths = '/home/zipzinger/.config/nvim/lua/snippets' }
+            end,
+          },
         },
         opts = {},
       },
@@ -958,6 +1109,12 @@ require('lazy').setup({
   --         comments = { italic = false }, -- Disable italics in comments
   --       },
   --     }
+  {
+    'folke/tokyonight.nvim',
+    lazy = false,
+    priority = 1000,
+    opts = {},
+  },
   --
   --     -- Load the colorscheme here.
   --     -- Like many other themes, this one has different styles, and you could load
@@ -1011,6 +1168,10 @@ require('lazy').setup({
   --     vim.cmd.colorscheme 'catppuccin-macchiato'
   --   end,
   -- },
+  { 'Hoffs/omnisharp-extended-lsp.nvim', lazy = true },
+  {
+    'Issafalcon/neotest-dotnet',
+  },
 
   -- vim.cmd.colorscheme 'catppuccin',
   -- Highlight todo, notes, etc in comments
@@ -1079,6 +1240,7 @@ require('lazy').setup({
         'gitignore',
         'make',
         'bash',
+        'c_sharp',
       },
       -- Autoinstall languages that are not installed
       auto_install = true,
@@ -1137,6 +1299,10 @@ require('lazy').setup({
   require 'plugins/lualine',
   require 'plugins/autosession',
   require 'plugins/comment',
+  require 'plugins/neoscroll',
+  require 'plugins/obsidian',
+  -- require 'plugins/stscursorword',
+  -- require 'plugins/omnisharp-nvim',
   -- require 'plugins/nvimtree',
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
@@ -1171,7 +1337,16 @@ require('lazy').setup({
   },
 })
 
-vim.cmd 'colorscheme rose-pine'
+-- require('obsidian').setup()
+require('lspconfig').gdscript.setup {
+  cmd = { 'ncat', '127.0.0.1', '6005' },
+  root_dir = require('lspconfig.util').root_pattern 'project.godot',
+  filetypes = { 'gd', 'gdscript', 'gdscript3' },
+}
+
+-- vim.cmd 'colorscheme rose-pine'
+-- vim.cmd 'colorscheme rose-pine-moon'
+vim.cmd 'colorscheme tokyonight-storm'
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
